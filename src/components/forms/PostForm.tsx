@@ -1,20 +1,29 @@
+import * as z from "zod"
+import { Models } from "appwrite"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import * as z from "zod"
+import { useNavigate } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "../ui/textarea"
 import FileUploader from "../shared/FileUploader"
+import Loader from "../shared/Loader"
 import { PostValidation } from "@/lib/validation"
-import { Models } from "appwrite"
+import { useUserContext } from "@/context/AuthContext"
+import { useCreatePost } from "@/lib/react-query/queriesAndMutations"
+import { useToast } from "../ui/use-toast"
 
 type PostFormProps = {
   post?: Models.Document;
+  action: "Create"
 }
 
-const PostForm = ({ post }: PostFormProps) => {
+const PostForm = ({ post, action }: PostFormProps) => {
+  const { user } = useUserContext();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const form = useForm<z.infer<typeof PostValidation>>({
     resolver: zodResolver(PostValidation),
     defaultValues: {
@@ -24,17 +33,29 @@ const PostForm = ({ post }: PostFormProps) => {
       tags: post ? post.tags.join(',') : ""
     },
   })
+
+  // Query
+  const { mutateAsync: createPost, isPending: isLoadingCreate } = useCreatePost();
  
   // 2. Define a submit handler.
-  function onSubmit(values: z.infer<typeof PostValidation>) {
-    // Do something with the form values.
-    // ✅ This will be type-safe and validated.
-    console.log(values)
+  const handleSubmit = async (values: z.infer<typeof PostValidation>) => {
+    // ACTION = CREATE
+    const newPost = await createPost({
+      ...values,
+      userId: user.id,
+    })
+
+    if(!newPost){
+      toast({
+        title: `${action} post failed. Please try again.`
+      })
+    }
+    navigate('/')
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-9 w-full max-w-5xl">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col gap-9 w-full max-w-5xl">
         <FormField
           control={form.control}
           name="caption"
@@ -96,8 +117,19 @@ const PostForm = ({ post }: PostFormProps) => {
           )}
         />
         <div className="flex gap-4 items-center justify-end">
-          <Button type="button" className="shad-button_dark_4">Cancel</Button>
-          <Button type="button" className="shad-button_primary whitespace-nowrap">Submit</Button>
+          <Button 
+            type="button" 
+            className="shad-button_dark_4"
+            onClick={() => navigate(-1)}>
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            className="shad-button_primary whitespace-nowrap"
+            disabled={isLoadingCreate}>
+            {(isLoadingCreate) && <Loader />}
+            {action} Post
+          </Button>
         </div>
       </form>
     </Form>
