@@ -12,12 +12,12 @@ import FileUploader from "../shared/FileUploader"
 import Loader from "../shared/Loader"
 import { PostValidation } from "@/lib/validation"
 import { useUserContext } from "@/context/AuthContext"
-import { useCreatePost } from "@/lib/react-query/queriesAndMutations"
+import { useCreatePost, useUpdatePost } from "@/lib/react-query/queriesAndMutations"
 import { useToast } from "../ui/use-toast"
 
 type PostFormProps = {
   post?: Models.Document;
-  action: "Create"
+  action: "Create" | "Update"
 }
 
 const PostForm = ({ post, action }: PostFormProps) => {
@@ -36,9 +36,26 @@ const PostForm = ({ post, action }: PostFormProps) => {
 
   // Query
   const { mutateAsync: createPost, isPending: isLoadingCreate } = useCreatePost();
+  const { mutateAsync: updatePost, isPending: isLoadingUpdate } = useUpdatePost();
  
   // 2. Define a submit handler.
   const handleSubmit = async (values: z.infer<typeof PostValidation>) => {
+    // ACTION = UPDATE
+    if(post && action === 'Update'){
+      const updatedPost = await updatePost({
+        ...values,
+        postId: post.$id,
+        imageId: post?.imageId,
+        imageUrl: post?.imageUrl,
+      })
+
+      if(!updatedPost){
+        toast({title: 'Please try again'})
+      }
+
+      return navigate(`/posts/${post.$id}`)
+    }
+
     // ACTION = CREATE
     const newPost = await createPost({
       ...values,
@@ -126,8 +143,8 @@ const PostForm = ({ post, action }: PostFormProps) => {
           <Button 
             type="submit" 
             className="shad-button_primary whitespace-nowrap"
-            disabled={isLoadingCreate}>
-            {(isLoadingCreate) && <Loader />}
+            disabled={isLoadingCreate || isLoadingUpdate}>
+            {(isLoadingCreate || isLoadingUpdate) && <Loader />}
             {action} Post
           </Button>
         </div>
